@@ -19,7 +19,7 @@ import { useToast } from "@/components/shared/toast-provider";
 import type { IStudent } from "@/models/Student";
 import type { PaginatedResult } from "@/types";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export function StudentList() {
   const [search, setSearch] = useState("");

@@ -51,7 +51,7 @@ const ACTION_TONE: Record<ActivityAction, string> = {
 };
 
 const ENTITY_TYPES = ["Student", "ClassRoom", "School", "AcademicYear", "Announcement", "User"];
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export function ActivityTimeline() {
   const [entityType, setEntityType] = useState<string>("");

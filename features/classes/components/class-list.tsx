@@ -18,7 +18,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useToast } from "@/components/shared/toast-provider";
 import type { IClassRoom } from "@/models/ClassRoom";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 export function ClassList() {
   const [search, setSearch] = useState("");

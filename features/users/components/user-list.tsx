@@ -23,7 +23,7 @@ const TABS = [
   { role: "parent" as const, label: "Orang Tua" },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 const STATUS_VARIANT: Record<string, "default" | "gray" | "red"> = {
   active: "default",
