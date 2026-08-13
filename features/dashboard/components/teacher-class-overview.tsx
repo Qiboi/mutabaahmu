@@ -57,7 +57,7 @@ export function TeacherClassOverview({ classId, date }: { classId: string | unde
                 className="py-8"
               />
             ) : (
-              <ul className="space-y-2">
+              <ul className="max-h-[224px] space-y-2 overflow-y-auto pr-1">
                 {stats.notSubmittedStudents.map((s) => (
                   <li
                     key={s.studentId}

@@ -1,4 +1,5 @@
 import { Schema, model, models, type Document, type Model, type Types } from "mongoose";
+import "@/models/AcademicYear";
 
 export interface IClassRoom extends Document {
   _id: Types.ObjectId;
