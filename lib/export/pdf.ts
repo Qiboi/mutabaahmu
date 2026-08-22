@@ -8,6 +8,12 @@ const EMERALD = "#059669";
 const SLATE = "#334155";
 const SLATE_LIGHT = "#94a3b8";
 
+/** Formats surah sessions as "Al-Baqarah (1-20), Ali 'Imran (1-5)" for the detail appendix. */
+function formatQuranDetails(entries: IDailyReport["items"]["tilawahDetails"]): string {
+  if (!entries || entries.length === 0) return "";
+  return entries.map((e) => `${e.surahName} (${e.ayatFrom}-${e.ayatTo})`).join(", ");
+}
+
 export function buildStudentSummaryPdf(params: {
   student: Pick<IStudent, "fullName" | "nisn">;
   reports: IDailyReport[];
@@ -90,6 +96,42 @@ export function buildStudentSummaryPdf(params: {
 
       y += rowHeight;
     });
+
+    // Detail appendix — surah rincian & book titles don't fit legibly inside the narrow table
+    // columns above, so days with any rincian get a short line here instead, on their own page.
+    const daysWithDetail = sorted.filter(
+      (r) =>
+        (r.items.tilawahDetails?.length ?? 0) > 0 ||
+        (r.items.murajaahDetails?.length ?? 0) > 0 ||
+        !!r.items.bookTitle,
+    );
+
+    if (daysWithDetail.length > 0) {
+      doc.addPage();
+      doc.fontSize(13).fillColor(EMERALD).text("Rincian Tilawah, Murajaah & Bacaan Buku");
+      doc.moveDown(0.5);
+
+      daysWithDetail.forEach((r) => {
+        if (doc.y > 760) {
+          doc.addPage();
+        }
+
+        const dateLabel = format(new Date(r.date), "d MMM yyyy", { locale: idLocale });
+        const lines: string[] = [];
+
+        const tilawahText = formatQuranDetails(r.items.tilawahDetails);
+        if (tilawahText) lines.push(`Tilawah: ${tilawahText}`);
+
+        const murajaahText = formatQuranDetails(r.items.murajaahDetails);
+        if (murajaahText) lines.push(`Murajaah: ${murajaahText}`);
+
+        if (r.items.bookTitle) lines.push(`Buku: ${r.items.bookTitle}`);
+
+        doc.fontSize(9.5).fillColor(SLATE).text(dateLabel);
+        doc.fontSize(8.5).fillColor(SLATE_LIGHT).text(lines.join("   •   "));
+        doc.moveDown(0.5);
+      });
+    }
 
     doc.end();
   });

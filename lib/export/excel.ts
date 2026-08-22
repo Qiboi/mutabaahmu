@@ -11,10 +11,22 @@ const HEADER_FILL: ExcelJS.Fill = {
 };
 const HEADER_FONT: Partial<ExcelJS.Font> = { bold: true, color: { argb: "FFFFFFFF" } };
 
+/** Concatenates surah sessions into a single readable cell value, e.g.
+ *  "Al-Baqarah (1-20); Ali 'Imran (1-5)". Returns "-" when there's nothing to show. */
+function formatQuranDetails(entries: IDailyReport["items"]["tilawahDetails"]): string {
+  if (!entries || entries.length === 0) return "-";
+  return entries.map((e) => `${e.surahName} (${e.ayatFrom}-${e.ayatTo})`).join("; ");
+}
+
 /**
  * One row per student, one column per calendar day in the month.
  * Cell value = total points that day, blank if the student didn't submit a report.
  * Last column = average points across days that had a submission.
+ *
+ * Intentionally unchanged for the tilawah/murajaah/buku detail feature: this sheet is a
+ * compact monthly point overview, not a per-report detail view — cramming per-surah rincian
+ * into a day-column grid would make it unreadable. Full rincian belongs in the per-student
+ * summary sheet/PDF below.
  */
 export async function buildMonthlyClassWorkbook(params: {
   className: string;
@@ -103,10 +115,12 @@ export async function buildStudentSummaryWorkbook(params: {
   workbook.created = new Date();
   const sheet = workbook.addWorksheet("Ringkasan Siswa");
 
-  sheet.mergeCells(1, 1, 1, 11);
+  const COLUMN_COUNT = 14;
+
+  sheet.mergeCells(1, 1, 1, COLUMN_COUNT);
   sheet.getCell(1, 1).value = `Ringkasan Laporan — ${student.fullName}${student.nisn ? ` (NISN: ${student.nisn})` : ""}`;
   sheet.getCell(1, 1).font = { bold: true, size: 14 };
-  sheet.mergeCells(2, 1, 2, 11);
+  sheet.mergeCells(2, 1, 2, COLUMN_COUNT);
   sheet.getCell(2, 1).value = `Periode: ${fromLabel} — ${toLabel}`;
 
   const headers = [
@@ -117,8 +131,11 @@ export async function buildStudentSummaryWorkbook(params: {
     "Maghrib",
     "Isya",
     "Tilawah (hal)",
+    "Rincian Tilawah",
     "Murajaah (mnt)",
+    "Rincian Murajaah",
     "Membaca (mnt)",
+    "Judul Buku",
     "Total Poin",
     "Komentar Guru",
   ];
@@ -143,14 +160,19 @@ export async function buildStudentSummaryWorkbook(params: {
       row.getCell(5).value = r.items.prayers.maghrib ? YES : NO;
       row.getCell(6).value = r.items.prayers.isya ? YES : NO;
       row.getCell(7).value = r.items.tilawahPages;
-      row.getCell(8).value = r.items.murajaahMinutes;
-      row.getCell(9).value = r.items.readingMinutes;
-      row.getCell(10).value = r.totalPoints;
-      row.getCell(11).value = r.teacherComment ?? "";
+      row.getCell(8).value = formatQuranDetails(r.items.tilawahDetails);
+      row.getCell(9).value = r.items.murajaahMinutes;
+      row.getCell(10).value = formatQuranDetails(r.items.murajaahDetails);
+      row.getCell(11).value = r.items.readingMinutes;
+      row.getCell(12).value = r.items.bookTitle ?? "-";
+      row.getCell(13).value = r.totalPoints;
+      row.getCell(14).value = r.teacherComment ?? "";
     });
 
+  const columnWidths = [14, 8, 8, 8, 8, 8, 10, 28, 12, 28, 12, 22, 10, 30];
   sheet.columns.forEach((col, i) => {
-    col.width = i === 0 ? 14 : i === 10 ? 30 : 12;
+    col.width = columnWidths[i] ?? 12;
+    col.alignment = { wrapText: true, vertical: "top" };
   });
   sheet.views = [{ state: "frozen", ySplit: 4 }];
 

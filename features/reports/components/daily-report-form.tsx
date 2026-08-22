@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, useFieldArray, Controller, type Control, type FieldErrors, type UseFormRegister, type UseFormSetValue } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
@@ -19,6 +19,8 @@ import {
   HandCoins,
   HeartHandshake,
   AlarmClock,
+  Plus,
+  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -30,6 +32,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SURAH_LIST } from "@/constants/surah";
 import {
   createDailyReportSchema,
   type CreateDailyReportInput,
@@ -104,6 +107,133 @@ function ToggleChip({
   );
 }
 
+/**
+ * Dynamic list of "surah + ayat range" entries, shared by the Tilawah and Murajaah sections.
+ * A day can have several sessions (e.g. finishing one surah then starting the next), so this
+ * is a field array rather than a single fixed surah/ayat pair.
+ */
+function QuranSessionFieldArray({
+  control,
+  register,
+  setValue,
+  errors,
+  name,
+  label,
+}: {
+  control: Control<CreateDailyReportInput>;
+  register: UseFormRegister<CreateDailyReportInput>;
+  setValue: UseFormSetValue<CreateDailyReportInput>;
+  errors: FieldErrors<CreateDailyReportInput>;
+  name: "tilawahDetails" | "murajaahDetails";
+  label: string;
+}) {
+  const fieldName = `items.${name}` as const;
+  const { fields, append, remove } = useFieldArray({ control, name: fieldName });
+
+  const fieldErrors = errors.items?.[name];
+  const rootMessage = !Array.isArray(fieldErrors) ? fieldErrors?.message : undefined;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={fields.length >= 10}
+          onClick={() => append({ surahNumber: 0, surahName: "", ayatFrom: 1, ayatTo: 1 })}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Tambah Surat
+        </Button>
+      </div>
+
+      {rootMessage && <p className="text-xs text-red-600">{rootMessage}</p>}
+
+      {fields.length === 0 && (
+        <p className="text-xs text-slate-400">Belum ada rincian surat ditambahkan.</p>
+      )}
+
+      <div className="space-y-2">
+        {fields.map((field, index) => {
+          const entryErrors = Array.isArray(fieldErrors) ? fieldErrors[index] : undefined;
+
+          return (
+            <div
+              key={field.id}
+              className="flex flex-wrap items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3"
+            >
+              <div className="min-w-44 flex-1 space-y-1">
+                <Controller
+                  control={control}
+                  name={`${fieldName}.${index}.surahNumber`}
+                  render={({ field: surahField }) => (
+                    <Select
+                      value={surahField.value || ""}
+                      onChange={(e) => {
+                        const num = Number(e.target.value);
+                        surahField.onChange(num);
+                        const surah = SURAH_LIST.find((s) => s.number === num);
+                        setValue(`${fieldName}.${index}.surahName`, surah?.name ?? "");
+                      }}
+                    >
+                      <option value="">Pilih surat</option>
+                      {SURAH_LIST.map((s) => (
+                        <option key={s.number} value={s.number}>
+                          {s.number}. {s.name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                />
+                {entryErrors?.surahNumber && (
+                  <p className="text-xs text-red-600">{entryErrors.surahNumber.message}</p>
+                )}
+              </div>
+
+              <div className="w-24 space-y-1">
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="Ayat dari"
+                  {...register(`${fieldName}.${index}.ayatFrom`)}
+                />
+                {entryErrors?.ayatFrom && (
+                  <p className="text-xs text-red-600">{entryErrors.ayatFrom.message}</p>
+                )}
+              </div>
+
+              <div className="w-24 space-y-1">
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="Ayat sampai"
+                  {...register(`${fieldName}.${index}.ayatTo`)}
+                />
+                {entryErrors?.ayatTo && (
+                  <p className="text-xs text-red-600">{entryErrors.ayatTo.message}</p>
+                )}
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => remove(index)}
+                aria-label="Hapus rincian surat"
+                className="mt-0.5 text-red-500 hover:bg-red-50 hover:text-red-600"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function DailyReportForm() {
   const { data: children, isLoading: isLoadingChildren } = useMyChildren();
   const submitMutation = useSubmitDailyReport();
@@ -117,6 +247,7 @@ export function DailyReportForm() {
     handleSubmit,
     control,
     watch,
+    setValue,
     reset,
     formState: { errors },
   } = useForm<CreateDailyReportInput>({
@@ -128,10 +259,13 @@ export function DailyReportForm() {
         prayers: { subuh: false, dzuhur: false, ashar: false, maghrib: false, isya: false },
         sunnahPrayer: false,
         tilawahPages: 0,
+        tilawahDetails: [],
         murajaahMinutes: 0,
+        murajaahDetails: [],
         infak: false,
         helpingParents: false,
         readingMinutes: 0,
+        bookTitle: "",
         wakeUpEarly: false,
         notes: "",
       },
@@ -139,6 +273,7 @@ export function DailyReportForm() {
   });
 
   const selectedStudentId = watch("studentId");
+  const readingMinutes = watch("items.readingMinutes");
 
   function onSubmit(values: CreateDailyReportInput) {
     submitMutation.mutate(values, {
@@ -188,8 +323,8 @@ export function DailyReportForm() {
             <div
               role="alert"
               className={`rounded-(--radius-control) border px-4 py-3 text-sm ${isDuplicateError
-                  ? "border-amber-200 bg-amber-50 text-amber-700"
-                  : "border-red-200 bg-red-50 text-red-700"
+                ? "border-amber-200 bg-amber-50 text-amber-700"
+                : "border-red-200 bg-red-50 text-red-700"
                 }`}
             >
               {error.message}
@@ -260,9 +395,10 @@ export function DailyReportForm() {
             </div>
           </fieldset>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="tilawahPages">Tilawah (halaman)</Label>
+          <fieldset className="space-y-3 rounded-2xl border border-slate-100 p-4">
+            <legend className="px-1 text-sm font-medium text-slate-700">Tilawah Al-Qur&apos;an</legend>
+            <div className="max-w-40 space-y-1.5">
+              <Label htmlFor="tilawahPages">Jumlah Halaman</Label>
               <Input
                 id="tilawahPages"
                 type="number"
@@ -271,8 +407,20 @@ export function DailyReportForm() {
                 {...register("items.tilawahPages")}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="murajaahMinutes">Murajaah (menit)</Label>
+            <QuranSessionFieldArray
+              control={control}
+              register={register}
+              setValue={setValue}
+              errors={errors}
+              name="tilawahDetails"
+              label="Rincian Surat"
+            />
+          </fieldset>
+
+          <fieldset className="space-y-3 rounded-2xl border border-slate-100 p-4">
+            <legend className="px-1 text-sm font-medium text-slate-700">Murajaah</legend>
+            <div className="max-w-40 space-y-1.5">
+              <Label htmlFor="murajaahMinutes">Durasi (menit)</Label>
               <Input
                 id="murajaahMinutes"
                 type="number"
@@ -280,16 +428,43 @@ export function DailyReportForm() {
                 {...register("items.murajaahMinutes")}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="readingMinutes">Membaca Buku (menit)</Label>
-              <Input
-                id="readingMinutes"
-                type="number"
-                min={0}
-                {...register("items.readingMinutes")}
-              />
+            <QuranSessionFieldArray
+              control={control}
+              register={register}
+              setValue={setValue}
+              errors={errors}
+              name="murajaahDetails"
+              label="Rincian Surat"
+            />
+          </fieldset>
+
+          <fieldset className="space-y-3 rounded-2xl border border-slate-100 p-4">
+            <legend className="px-1 text-sm font-medium text-slate-700">Membaca Buku</legend>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="readingMinutes">Durasi (menit)</Label>
+                <Input
+                  id="readingMinutes"
+                  type="number"
+                  min={0}
+                  {...register("items.readingMinutes")}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bookTitle">
+                  Judul Buku {readingMinutes > 0 && <span className="text-red-500">*</span>}
+                </Label>
+                <Input
+                  id="bookTitle"
+                  placeholder="Misal: Kisah 25 Nabi dan Rasul"
+                  {...register("items.bookTitle")}
+                />
+                {errors.items?.bookTitle && (
+                  <p className="text-xs text-red-600">{errors.items.bookTitle.message}</p>
+                )}
+              </div>
             </div>
-          </div>
+          </fieldset>
 
           <div className="space-y-1.5">
             <Label htmlFor="notes">Catatan Tambahan (opsional)</Label>

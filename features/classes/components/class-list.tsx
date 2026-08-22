@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Plus, Pencil, School as SchoolIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Plus, Pencil, Eye, School as SchoolIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import type { IClassRoom } from "@/models/ClassRoom";
 const PAGE_SIZE = 10;
 
 export function ClassList() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search);
   const [page, setPage] = useState(1);
@@ -43,6 +44,10 @@ export function ClassList() {
   function openEdit(classRoom: IClassRoom) {
     setEditing(classRoom);
     setDialogOpen(true);
+  }
+
+  function openDetail(classRoom: IClassRoom) {
+    router.push(`/dashboard/admin/classes/${classRoom._id.toString()}`);
   }
 
   function handleStatusClick(classRoom: IClassRoom) {
@@ -120,14 +125,7 @@ export function ClassList() {
               <TableBody>
                 {data.items.map((c) => (
                   <TableRow key={c._id.toString()}>
-                    <TableCell className="font-medium text-slate-900">
-                      <Link
-                        href={`/dashboard/admin/classes/${c._id.toString()}`}
-                        className="hover:text-emerald-700 hover:underline"
-                      >
-                        {c.name}
-                      </Link>
-                    </TableCell>
+                    <TableCell className="font-medium text-slate-900">{c.name}</TableCell>
                     <TableCell>Kelas {c.grade}</TableCell>
                     <TableCell>
                       {(c.homeroomTeacherId as unknown as { name?: string })?.name ?? (
@@ -142,6 +140,9 @@ export function ClassList() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openDetail(c)} aria-label="Lihat Detail">
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => openEdit(c)} aria-label="Ubah">
                           <Pencil className="h-4 w-4" />
                         </Button>
